@@ -9,8 +9,8 @@ namespace expense_api.Repositories
 {
     public interface IExpenseRepository
     {
-        Task<Expense> GetById(int id);
-        Task<ExpenseReport> GetByIdForReport(int id);
+        Task<Result<Expense>> GetById(int id);
+        Task<Result<ExpenseReport>> GetByIdForReport(int id);
         Task<Result<int>> Save(Expense expense);
     }
 }

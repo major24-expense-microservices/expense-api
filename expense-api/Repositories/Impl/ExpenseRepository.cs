@@ -89,14 +89,76 @@ namespace expense_api.Repositories
             }
         }
 
-        public async Task<Expense> GetById(int id)
+        public async Task<Result<Expense>> GetById(int id)
         {
-            throw new NotImplementedException();
+            try
+            {
+                using (var conn = _sqlConnHelper.Connection)
+                {
+                    string sql = @"select Id, user_id as userid, cost_centre as costcentre, approver_id as approverid, status, submitted_date as submitteddate, updated_date as updateddate
+                                    from [dbo].[expenses]";
+                    DynamicParameters dp = new DynamicParameters();
+                    dp.Add("id", id, System.Data.DbType.Int32, System.Data.ParameterDirection.Input);
+
+                    conn.Open();
+                    var result = await conn.QueryFirstOrDefaultAsync<Result<Expense>>(sql, dp);
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                return new Result<Expense>() { IsSuccess = false, Error = ex.Message };
+                // throw new Exception("Error getting expense by id" + ex.Message);
+            }
         }
 
-        public async Task<ExpenseReport> GetByIdForReport(int id)
+        public async Task<Result<ExpenseReport>> GetByIdForReport(int id)
         {
-            throw new NotImplementedException();
+            Result<ExpenseReport> response = new Result<ExpenseReport>();
+            try
+            {
+                ExpenseReport expenseReport = new ExpenseReport();
+                using (var conn = _sqlConnHelper.Connection)
+                {
+                    // multi query
+                    string sqlExp = @"SELECT [id], [user_id] as userid, [cost_centre] as costcentre, [approver_id] as approverid, [status], [submitted_date] as submitteddate
+                                        FROM [dbo].[expenses] where id = @expenseid;";
+
+                    string sqlExpItems = @"select t.id, t.expense_id as expenseid, t.trans_type as transtype, t.description, t.amount, t.tax, clkp.description as category, t.trans_date as transdate
+		                                    from [dbo].[expensed_transactions] t
+		                                    inner join [dbo].[category_lookup] clkp
+		                                    on t.category = clkp.category
+		                                    where t.expense_id = @expenseid;";
+
+                    string sqlUser = @"select u.user_id as userid, u.first_name as firstname, u.last_name as lastname, email from [dbo].[users] u
+	                                        inner join [dbo].[expenses] e
+	                                        on e.user_id = u.user_id
+	                                        where e.id = @expenseid;";
+
+                    var queries = $"{sqlExp} {sqlExpItems} {sqlUser}";
+
+                    conn.Open();
+                    using (var multi = conn.QueryMultiple(queries, new { expenseid = id }))
+                    {
+                        var expense = multi.Read<Expense>();
+                        var expItems = multi.Read<ExpenseItem>().ToArray();
+                        var user = multi.Read<User>();
+
+                        expenseReport.Expense = expense.FirstOrDefault();
+                        expenseReport.ExpenseItems = expItems;
+                        expenseReport.User = user.FirstOrDefault();
+                    }
+
+                    response.Entity = expenseReport;
+                    return await Task.FromResult(response);
+                }
+            }
+            catch (Exception ex)
+            {
+                response.Error = ex.Message;
+                return await Task.FromResult(response);
+                // throw new Exception("Error getting expense by id" + ex.Message);
+            }
         }
     }
 }

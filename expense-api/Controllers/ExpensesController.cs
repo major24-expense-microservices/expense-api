@@ -68,6 +68,34 @@ namespace expense_api.Controllers
             }
         }
 
+        // GET: api/Expenses/{id}
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Result<ExpenseReport>>> Get(int id)
+        {
+            if (id < 1)
+            {
+                return BadRequest($"Invalid request for the expense id {id}");
+            }
+
+            try
+            {
+                Result<ExpenseReport> expenseReport = await _expenseRepository.GetByIdForReport(id);
+                if (expenseReport == null)
+                {
+                    return NotFound($"Expense(s) not found for the provided id {id}");
+                }
+                return expenseReport;
+
+            }
+            catch (Exception ex)
+            {
+                Result result = new Result() { IsSuccess = false, Error = $"Error retrieving expense report record. {ex.Message}" };
+                return StatusCode(500, result);
+                // return StatusCode(500, "Error retrieving expenses. " + ex.Message);
+            }
+        }
+
+
         private Result<bool> ValidateUser(User user)
         {
             Result<bool> result = new Result<bool>();
